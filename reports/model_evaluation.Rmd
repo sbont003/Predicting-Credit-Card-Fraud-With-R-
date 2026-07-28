@@ -1,0 +1,89 @@
+---
+title: "Credit Card Fraud Model Evaluation"
+author: "Predicting Credit Card Fraud with R"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: flatly
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+library(dplyr)
+library(ggplot2)
+root <- normalizePath("..")
+metrics_path <- file.path(root, "models", "model_metrics", "comparison.csv")
+json_path <- file.path(root, "models", "model_metrics", "metrics.json")
+sample_path <- file.path(root, "data", "processed", "scored_sample.csv")
+```
+
+## Overview
+
+This report summarizes fraud-classification results on a highly imbalanced credit-card transaction dataset.
+Accuracy is intentionally **not** used as the primary metric. Evaluation focuses on **precision, recall, F1, ROC-AUC, PR-AUC**, and false negatives.
+
+The model supports human review and does not permanently block cards.
+
+```{r load}
+if (!file.exists(metrics_path)) {
+  cat("Run `Rscript scripts/run_pipeline.R` first to generate metrics.")
+  knitr::knit_exit()
+}
+cmp <- read.csv(metrics_path)
+meta <- jsonlite::fromJSON(json_path)
+```
+
+## Selected model
+
+- **Model:** `r meta$selected_model`
+- **Version:** `r meta$model_version`
+- **Decision threshold:** `r meta$threshold`
+- **Balance method (train only):** `r meta$balance_method`
+
+### Test-set metrics
+
+```{r test-metrics}
+knitr::kable(as.data.frame(meta$test), digits = 4)
+```
+
+## Model comparison (validation, optimized threshold)
+
+```{r comparison}
+knitr::kable(cmp, digits = 4)
+```
+
+```{r plot-f1, fig.width=8, fig.height=4}
+val <- cmp[cmp$dataset == "validation_optimized", ]
+ggplot(val, aes(x = reorder(model, f1), y = f1, fill = model)) +
+  geom_col(show.legend = FALSE) +
+  coord_flip() +
+  labs(title = "Validation F1 at optimized threshold", x = NULL, y = "F1") +
+  theme_minimal()
+```
+
+```{r plot-pr, fig.width=8, fig.height=4}
+ggplot(val, aes(x = reorder(model, recall), y = recall, fill = model)) +
+  geom_col(show.legend = FALSE) +
+  coord_flip() +
+  labs(title = "Validation recall (fraud detection rate)", x = NULL, y = "Recall") +
+  theme_minimal()
+```
+
+## Score distribution
+
+```{r scores, fig.width=8, fig.height=4}
+if (file.exists(sample_path)) {
+  sc <- read.csv(sample_path)
+  ggplot(sc, aes(x = fraud_probability, fill = Class)) +
+    geom_histogram(bins = 40, alpha = 0.7, position = "identity") +
+    labs(title = "Fraud probability on held-out sample", x = "P(fraud)", y = "Count") +
+    theme_minimal()
+}
+```
+
+## Limitations
+
+- Features `V1`–`V28` are anonymized PCA components; do not invent business meanings.
+- Public / synthetic data is not a production bank feed.
+- SMOTE/ROSE applied only to training data to avoid leakage.

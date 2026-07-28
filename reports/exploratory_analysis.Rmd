@@ -1,0 +1,10 @@
+# Exploratory notes
+
+See `scripts/run_pipeline.R` for the executable workflow and `reports/model_evaluation.Rmd` for the HTML report.
+
+Key EDA questions:
+
+1. What is the fraud rate?
+2. How do Amount distributions differ by Class?
+3. Are there time clusters of fraud?
+4. Which anonymized features separate classes (without inventing meanings)?
